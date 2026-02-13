@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+ulimit -c 0
+
+module purge
+module load openjdk
+
+cd "${HOME}"
+
+###########################################################
+# Disable GVFS / Udisks noise
+###########################################################
+export GVFS_DISABLE_FUSE=1
+export GIO_USE_VFS=local
+export UDISKS_IGNORE=1
+
+###########################################################
+# Disable ALL XFCE desktop icons (kills loop mount icons)
+###########################################################
+xfconf-query -c xfdesktop -p /desktop-icons/style -n -t int -s 0
+
+###########################################################
+# XFCE Setup
+###########################################################
+(
+  eval "$(dbus-launch --sh-syntax)"
+  export DBUS_SESSION_BUS_ADDRESS
+  
+  # Start the session first
+  xfce4-session &
+  
+  # Wait for the desktop manager to actually start
+  sleep 5
+  
+  # Now force the icons to hide while the session is live
+  xfconf-query -c xfdesktop -p /desktop-icons/file-icons/show-device -n -t bool -s false
+  xfconf-query -c xfdesktop -p /desktop-icons/file-icons/show-removable -n -t bool -s false
+  xfconf-query -c xfdesktop -p /desktop-icons/file-icons/show-trash -n -t bool -s false
+  
+  # Refresh xfdesktop to apply changes immediately
+  xfdesktop --reload
+) &
+sleep 5
+###########################################################
+# Launch fastqc
+###########################################################
+module load mathematica/<%= context.version %>
+
+# Launch MATHEMATICA
+mathematica
