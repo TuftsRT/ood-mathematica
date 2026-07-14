@@ -6,10 +6,10 @@ _resource_result = ERB.new(File.read(_partial_path)).result(binding)
 %>
 cluster: "pax"
 form:
+  - partition
   - bc_num_hours
   - num_cores
   - num_memory
-  - partition
   - version
   - ta_qos
 
