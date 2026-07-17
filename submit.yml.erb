@@ -3,16 +3,14 @@ batch_connect:
   template: "vnc"
     
 script:
-  email_on_started: true
-  email_on_terminated: true
   email: <%= ENV["USER"] %>@tufts.edu
-  job_name: "OnDemand/Paraview"
+  job_name: "OnDemand/Mathematica"
 
   native:
     - "--time=<%= bc_num_hours %>:00:00"
+    - "--cpus-per-task=<%= num_cores %>"
     - "--mem=<%= num_memory %>G"
     - "--nodes=1"
-    - "--ntasks=<%= num_cores %>"
     - "--partition=<%= partition %>"
     <%- if defined?(ta_qos) && ta_qos == "interactive" -%>
     - "--qos=<%= ta_qos %>"
