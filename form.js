@@ -238,10 +238,20 @@ function updateNumGpusForPartition() {
 
   var selectedPartition = partitionSelect.value;
   var selectedGpuType = gpuTypeSelect ? gpuTypeSelect.value : 'none';
+  var numGpusFormGroup = numGpusInput.closest('.mb-3') || numGpusInput.closest('.form-group');
 
   if (!selectedGpuType || selectedGpuType === 'none') {
+    // CPU-only selection (e.g. "None (CPU only)" on a lab GPU partition):
+    // hide the GPU count and submit no value.
+    if (numGpusFormGroup) {
+      numGpusFormGroup.style.display = 'none';
+    }
     numGpusInput.value = '';
     return;
+  }
+
+  if (numGpusFormGroup) {
+    numGpusFormGroup.style.display = '';
   }
 
   var datasetValue = (numGpusInput.dataset && numGpusInput.dataset.partitionGpuMaxGpus) ? numGpusInput.dataset.partitionGpuMaxGpus : null;
@@ -713,6 +723,49 @@ if (document.readyState === 'loading') {
     warning.style.display = 'block';
   }
 
+  // Partitions where "Request priority start" applies, from the partition
+  // select's data-interactive-qos-partitions (set by resource_discovery.erb).
+  // null means no data: leave the checkbox alone.
+  function interactiveQosPartitions() {
+    var partitionSelect = document.getElementById(ID_PREFIX + 'partition');
+    if (!partitionSelect) {
+      return null;
+    }
+    var json = (partitionSelect.dataset && partitionSelect.dataset.interactiveQosPartitions) ||
+      partitionSelect.getAttribute('data-interactive-qos-partitions');
+    if (!json) {
+      return null;
+    }
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      console.error('[qos] failed to parse data-interactive-qos-partitions JSON', e);
+      return null;
+    }
+  }
+
+  // Hide and uncheck "Request priority start" on partitions where
+  // --qos=interactive does not apply (preempt, blackwell, lab partitions);
+  // their jobs are submitted with the partition's own QOS instead.
+  function updateQosAvailability() {
+    var box = qosCheckbox();
+    var allowed = interactiveQosPartitions();
+    var partitionSelect = document.getElementById(ID_PREFIX + 'partition');
+    if (!box || !allowed || !partitionSelect) {
+      return;
+    }
+    var available = allowed.indexOf(partitionSelect.value) !== -1;
+    var formGroup = box.closest('.mb-3') || box.closest('.form-group') || box.closest('.form-check');
+    if (formGroup) {
+      formGroup.style.display = available ? '' : 'none';
+    }
+    if (!available && box.checked) {
+      box.checked = false;
+      applyQosLimits();
+    }
+    try { console.log('[qos] priority start', available ? 'available' : 'hidden', 'for', partitionSelect.value); } catch (_) {}
+  }
+
   function applyQosLimits() {
     var checked = interactiveChecked();
     limitedInputs().forEach(function (entry) {
@@ -748,6 +801,11 @@ if (document.readyState === 'loading') {
 
     box.addEventListener('change', applyQosLimits);
 
+    var partitionSelect = document.getElementById(ID_PREFIX + 'partition');
+    if (partitionSelect) {
+      partitionSelect.addEventListener('change', updateQosAvailability);
+    }
+
     // The resource-discovery handlers overwrite max on partition/GPU changes;
     // watch the max attributes and re-apply the cap while the box is checked.
     if (window.MutationObserver) {
@@ -768,6 +826,7 @@ if (document.readyState === 'loading') {
       });
     }
 
+    updateQosAvailability();
     applyQosLimits();
     try { console.log('[qos] interactive QOS limits initialized'); } catch (_) {}
     return true;
